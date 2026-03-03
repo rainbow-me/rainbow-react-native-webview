@@ -177,6 +177,7 @@ RCTAutoInsetsProtocol>
     _contentInset = UIEdgeInsetsZero;
     _savedKeyboardDisplayRequiresUserAction = YES;
     _active  = YES;
+    _sandbox =  YES;
     _injectedJavaScript = nil;
     _injectedJavaScriptForMainFrameOnly = YES;
     _injectedJavaScriptBeforeContentLoaded = nil;
@@ -315,6 +316,23 @@ RCTAutoInsetsProtocol>
   if (@available(iOS 11.0, *)) {
     [self.webView.configuration.websiteDataStore.httpCookieStore removeObserver:self];
   }
+}
+
+// Helper to read and convert the JS bundle
+- (WKWebViewConfiguration *)injectWeb3Provider: (WKWebViewConfiguration *)wkWebViewConfig {
+    NSString *filePath = [[NSBundle mainBundle] pathForResource:@"InjectedJSBundle" ofType:@"js"];
+    NSError *error = nil;
+    NSString *jsBundle = [NSString stringWithContentsOfFile:filePath encoding:NSUTF8StringEncoding error:&error];
+    if (error) {
+        NSLog(@"[RNCWebView: injectWeb3Provider] Error reading JS bundle file: %@", error.localizedDescription);
+        return wkWebViewConfig;
+    }
+    WKUserScript *userScript = [[WKUserScript alloc]
+                                initWithSource:jsBundle
+                                injectionTime:WKUserScriptInjectionTimeAtDocumentStart
+                                forMainFrameOnly:YES];
+    [wkWebViewConfig.userContentController addUserScript:userScript];
+    return wkWebViewConfig;
 }
 
 - (void)tappedMenuItem:(NSString *)eventType
@@ -508,6 +526,11 @@ RCTAutoInsetsProtocol>
 
   if (_applicationNameForUserAgent) {
     wkWebViewConfig.applicationNameForUserAgent = [NSString stringWithFormat:@"%@ %@", wkWebViewConfig.applicationNameForUserAgent, _applicationNameForUserAgent];
+  }
+
+  // Load and inject the ethereum provider JavaScript bundle (only for the dapp browser instance)
+  if(!_sandbox){
+      return [self injectWeb3Provider: wkWebViewConfig];
   }
 
   return wkWebViewConfig;
