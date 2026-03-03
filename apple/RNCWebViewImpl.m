@@ -260,6 +260,18 @@ RCTAutoInsetsProtocol>
 // Listener for long presses
 - (void)startLongPress:(UILongPressGestureRecognizer *)pressSender
 {
+    // Always recognize the long press gesture
+    if (pressSender.state == UIGestureRecognizerStateBegan) {
+        // Indicate the gesture is being handled
+        [pressSender setCancelsTouchesInView:YES];
+    }
+
+    // Handle the end or cancellation of the gesture
+    if (pressSender.state == UIGestureRecognizerStateEnded || pressSender.state == UIGestureRecognizerStateCancelled) {
+        // Prevent further gesture handling by the scroll view
+        [pressSender setCancelsTouchesInView:NO];
+    }
+
     if (pressSender.state != UIGestureRecognizerStateEnded || !self.menuItems) {
         return;
     }
@@ -603,15 +615,13 @@ RCTAutoInsetsProtocol>
 
 #if !TARGET_OS_OSX
   // Allow this object to recognize gestures
-  if (self.menuItems != nil) {
-    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(startLongPress:)];
-    longPress.delegate = self;
+  UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(startLongPress:)];
+  longPress.delegate = self;
 
-    longPress.minimumPressDuration = 0.4f;
-    longPress.numberOfTouchesRequired = 1;
-    longPress.cancelsTouchesInView = YES;
-    [self addGestureRecognizer:longPress];
-  }
+  longPress.minimumPressDuration = 0.4f;
+  longPress.numberOfTouchesRequired = 1;
+  longPress.cancelsTouchesInView = YES;
+  [self addGestureRecognizer:longPress];
 #endif // !TARGET_OS_OSX
 }
 
