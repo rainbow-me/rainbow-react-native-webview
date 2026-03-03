@@ -571,5 +571,9 @@ Class<RCTComponentViewProtocol> RNCWebViewCls(void)
     // android only
 }
 
+- (void)setActive:(BOOL)active {
+    [_view setActive:active];
+}
+
 @end
 #endif

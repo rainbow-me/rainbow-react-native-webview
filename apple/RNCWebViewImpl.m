@@ -176,6 +176,7 @@ RCTAutoInsetsProtocol>
     _autoManageStatusBarEnabled = YES;
     _contentInset = UIEdgeInsetsZero;
     _savedKeyboardDisplayRequiresUserAction = YES;
+    _active  = YES;
     _injectedJavaScript = nil;
     _injectedJavaScriptForMainFrameOnly = YES;
     _injectedJavaScriptBeforeContentLoaded = nil;
@@ -1202,11 +1203,15 @@ RCTAutoInsetsProtocol>
 - (void)webView:(WKWebView *)webView runJavaScriptAlertPanelWithMessage:(NSString *)message initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(void))completionHandler
 {
 #if !TARGET_OS_OSX
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:message preferredStyle:UIAlertControllerStyleAlert];
-  [alert addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-    completionHandler();
-  }]];
-  [[self topViewController] presentViewController:alert animated:YES completion:NULL];
+    if(_active){
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:message preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            completionHandler();
+        }]];
+        [[self topViewController] presentViewController:alert animated:YES completion:NULL];
+    } else {
+        completionHandler();
+    }
 #else
   NSAlert *alert = [[NSAlert alloc] init];
   [alert setMessageText:message];
@@ -1246,20 +1251,24 @@ RCTAutoInsetsProtocol>
  */
 - (void)webView:(WKWebView *)webView runJavaScriptTextInputPanelWithPrompt:(NSString *)prompt defaultText:(NSString *)defaultText initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(NSString *))completionHandler{
 #if !TARGET_OS_OSX
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:prompt preferredStyle:UIAlertControllerStyleAlert];
-  [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-    textField.text = defaultText;
-  }];
-  UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-    completionHandler([[alert.textFields lastObject] text]);
-  }];
-  [alert addAction:okAction];
-  UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) {
-    completionHandler(nil);
-  }];
-  [alert addAction:cancelAction];
-  alert.preferredAction = okAction;
-  [[self topViewController] presentViewController:alert animated:YES completion:NULL];
+   if(_active){
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:prompt preferredStyle:UIAlertControllerStyleAlert];
+        [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+            textField.text = defaultText;
+        }];
+        UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            completionHandler([[alert.textFields lastObject] text]);
+        }];
+        [alert addAction:okAction];
+        UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(UIAlertAction *action) {
+            completionHandler(nil);
+        }];
+        [alert addAction:cancelAction];
+        alert.preferredAction = okAction;
+        [[self topViewController] presentViewController:alert animated:YES completion:NULL];
+    } else {
+        completionHandler(nil);
+    }
 #else
   NSAlert *alert = [[NSAlert alloc] init];
   [alert setMessageText:prompt];
@@ -1294,19 +1303,23 @@ RCTAutoInsetsProtocol>
                         initiatedByFrame:(WKFrameInfo *)frame
                                     type:(WKMediaCaptureType)type
                          decisionHandler:(void (^)(WKPermissionDecision decision))decisionHandler {
-  if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElsePrompt || _mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElseDeny) {
-    if ([origin.host isEqualToString:webView.URL.host]) {
+  if(_active){
+    if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElsePrompt || _mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElseDeny) {
+      if ([origin.host isEqualToString:webView.URL.host]) {
+        decisionHandler(WKPermissionDecisionGrant);
+      } else {
+        WKPermissionDecision decision = _mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElsePrompt ? WKPermissionDecisionPrompt : WKPermissionDecisionDeny;
+        decisionHandler(decision);
+      }
+    } else if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_Deny) {
+      decisionHandler(WKPermissionDecisionDeny);
+    } else if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_Grant) {
       decisionHandler(WKPermissionDecisionGrant);
     } else {
-      WKPermissionDecision decision = _mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElsePrompt ? WKPermissionDecisionPrompt : WKPermissionDecisionDeny;
-      decisionHandler(decision);
+      decisionHandler(WKPermissionDecisionPrompt);
     }
-  } else if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_Deny) {
-    decisionHandler(WKPermissionDecisionDeny);
-  } else if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_Grant) {
-    decisionHandler(WKPermissionDecisionGrant);
   } else {
-    decisionHandler(WKPermissionDecisionPrompt);
+    decisionHandler(WKPermissionDecisionDeny);
   }
 }
 #endif
@@ -1320,6 +1333,15 @@ RCTAutoInsetsProtocol>
 }
 
 #endif // !TARGET_OS_OSX
+
+- (void)webView:(WKWebView *)webView contextMenuConfigurationForElement:(WKContextMenuElementInfo *)elementInfo completionHandler:(WK_SWIFT_UI_ACTOR void (^)(UIContextMenuConfiguration * _Nullable configuration))completionHandler WK_SWIFT_ASYNC_NAME(webView(_:contextMenuConfigurationFor:)) API_AVAILABLE(ios(13.0)) {
+    if(_active){
+        UIContextMenuConfiguration *defaultConfiguration = nil;
+        completionHandler(defaultConfiguration);
+    } else {
+        completionHandler(nil);
+    }
+}
 
 /**
  * Decides whether to allow or cancel a navigation.
@@ -1594,6 +1616,33 @@ didFinishNavigation:(WKNavigation *)navigation
 - (void)injectJavaScript:(NSString *)script
 {
   [self evaluateJS: script thenCall: nil];
+}
+
+- (void)dismissChildViewControllersIfNeeded {
+    if ([self topViewController]) {
+        [[self topViewController] dismissViewControllerAnimated:YES completion:nil];
+    }
+}
+
+- (void)setActive:(BOOL)enabled
+{
+    _active = enabled;
+
+
+  if (!enabled) {
+    // Disable any potential view controller (alert / filepicker / etc)
+    [self dismissChildViewControllersIfNeeded];
+
+    // Disable all media playback when the webview is no longer active
+      if (@available(iOS 15.0, *)) {
+          [self.webView setAllMediaPlaybackSuspended:YES completionHandler:nil];
+      }
+  } else {
+    // Restore all media playback when the webview is active again
+      if (@available(iOS 15.0, *)) {
+          [self.webView setAllMediaPlaybackSuspended:NO completionHandler:nil];
+      }
+  }
 }
 
 - (void)goForward
