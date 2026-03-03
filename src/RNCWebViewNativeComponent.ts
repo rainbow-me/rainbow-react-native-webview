@@ -307,8 +307,8 @@ export interface NativeCommands {
     viewRef: React.ElementRef<HostComponent<NativeProps>>,
     javascript: string
   ) => void;
-  requestFocus: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
   setActive: (viewRef: React.ElementRef<HostComponent<NativeProps>>, enabled: boolean) => void;
+  requestFocus: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
   postMessage: (
     viewRef: React.ElementRef<HostComponent<NativeProps>>,
     data: string

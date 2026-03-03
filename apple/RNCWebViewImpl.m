@@ -132,11 +132,11 @@ RCTAutoInsetsProtocol>
 {
 #if !TARGET_OS_OSX
   UIColor * _savedBackgroundColor;
+  UIViewPropertyAnimator *_frameAnimator;
+  BOOL _didHeightChange;
 #else
   RCTUIColor * _savedBackgroundColor;
 #endif // !TARGET_OS_OSX
-  UIViewPropertyAnimator *_frameAnimator;
-  BOOL _didHeightChange;
   BOOL _savedHideKeyboardAccessoryView;
   BOOL _savedKeyboardDisplayRequiresUserAction;
 
@@ -178,9 +178,9 @@ RCTAutoInsetsProtocol>
     _autoManageStatusBarEnabled = YES;
     _contentInset = UIEdgeInsetsZero;
     _savedKeyboardDisplayRequiresUserAction = YES;
+    _didHeightChange = NO;
     _active  = YES;
     _sandbox =  YES;
-    _didHeightChange = NO;
     _injectedJavaScript = nil;
     _injectedJavaScriptForMainFrameOnly = YES;
     _injectedJavaScriptBeforeContentLoaded = nil;
@@ -368,7 +368,7 @@ RCTAutoInsetsProtocol>
       colorString = @"#FFFFFF";
     }
   }
-
+  
   // Create a script to send the color to React Native
   NSString *colorInjectionScript = [NSString stringWithFormat:
                                     @"window.ReactNativeWebView.postMessage(JSON.stringify({ topic: 'injectedUnderPageBackgroundColor', payload: { underPageBackgroundColor: '%@' } }));", colorString];
@@ -503,8 +503,15 @@ RCTAutoInsetsProtocol>
   WKPreferences *prefs = [[WKPreferences alloc]init];
   BOOL _prefsUsed = NO;
   if (!_javaScriptEnabled) {
-    prefs.javaScriptEnabled = NO;
-    _prefsUsed = YES;
+      prefs.javaScriptEnabled = NO;
+      WKWebpagePreferences *webpagePreferences = [[WKWebpagePreferences alloc] init];
+      wkWebViewConfig.defaultWebpagePreferences = webpagePreferences;
+      if (@available(iOS 14.0, *)) {
+          webpagePreferences.allowsContentJavaScript = NO;
+      } else {
+          // Fallback on earlier versions
+      }
+      _prefsUsed = YES;
   }
 #if defined(__IPHONE_OS_VERSION_MAX_ALLOWED) && __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000 /* iOS 13 */
   if (@available(iOS 13.0, *)) {
@@ -604,11 +611,9 @@ RCTAutoInsetsProtocol>
     _webView.menuItems = _menuItems;
     _webView.suppressMenuItems = _suppressMenuItems;
     _webView.scrollView.delegate = self;
-    _webView.scrollView.scrollIndicatorInsets = UIEdgeInsetsMake(16, 0, 16, 0);
 #endif // !TARGET_OS_OSX
     _webView.UIDelegate = self;
     _webView.navigationDelegate = self;
-    [_webView addObserver:self forKeyPath:@"underPageBackgroundColor" options:NSKeyValueObservingOptionNew context:nil];
 #if !TARGET_OS_OSX
     if (_pullToRefreshEnabled) {
       [self addPullToRefreshControl];
@@ -629,9 +634,11 @@ RCTAutoInsetsProtocol>
     }
 
     _webView.scrollView.directionalLockEnabled = _directionalLockEnabled;
+    _webView.scrollView.scrollIndicatorInsets = UIEdgeInsetsMake(16, 0, 16, 0);
 #endif // !TARGET_OS_OSX
     _webView.allowsLinkPreview = _allowsLinkPreview;
     [_webView addObserver:self forKeyPath:@"estimatedProgress" options:NSKeyValueObservingOptionOld | NSKeyValueObservingOptionNew context:nil];
+    [_webView addObserver:self forKeyPath:@"underPageBackgroundColor" options:NSKeyValueObservingOptionNew context:nil];
     _webView.allowsBackForwardNavigationGestures = _allowsBackForwardNavigationGestures;
 
     _webView.customUserAgent = _userAgent;
@@ -1220,7 +1227,7 @@ RCTAutoInsetsProtocol>
     UIEdgeInsets scrollIndicatorInsets = UIEdgeInsetsMake(16, 0, 16, 0);
     CGFloat currentOffset = scrollView.contentOffset.y;
     BOOL isScrollViewBouncing = currentOffset <= 0;
-
+    
     _frameAnimator = [[UIViewPropertyAnimator alloc]
                       initWithDuration:0
                       curve:UIViewAnimationCurveLinear
@@ -1455,6 +1462,23 @@ RCTAutoInsetsProtocol>
     }
 }
 
+- (void)webView:(WKWebView *)webView didStartProvisionalNavigation:(WKNavigation *)navigation
+{
+  // Set opaque to NO to prevent white flash during initial load
+  _webView.opaque = NO;
+  // Clear the previous underPageBackgroundColor
+  _webView.underPageBackgroundColor = nil;
+}
+
+- (void)webView:(WKWebView *)webView didCommitNavigation:(WKNavigation *)navigation
+{
+  // Set opaque to YES when content starts loading
+  _webView.opaque = YES;
+  // Ensure background color is set
+  _webView.backgroundColor = _savedBackgroundColor;
+}
+
+
 /**
  * Decides whether to allow or cancel a navigation.
  * @see https://fburl.com/42r9fxob
@@ -1647,22 +1671,6 @@ RCTAutoInsetsProtocol>
   }
 }
 
-- (void)webView:(WKWebView *)webView didStartProvisionalNavigation:(WKNavigation *)navigation
-{
-  // Set opaque to NO to prevent white flash during initial load
-  _webView.opaque = NO;
-  // Clear the previous underPageBackgroundColor
-  _webView.underPageBackgroundColor = nil;
-}
-
-- (void)webView:(WKWebView *)webView didCommitNavigation:(WKNavigation *)navigation
-{
-  // Set opaque to YES when content starts loading
-  _webView.opaque = YES;
-  // Ensure background color is set
-  _webView.backgroundColor = _savedBackgroundColor;
-}
-
 - (void)evaluateJS:(NSString *)js
           thenCall: (void (^)(NSString*)) callback
 {
@@ -1755,12 +1763,12 @@ didFinishNavigation:(WKNavigation *)navigation
 - (void)setActive:(BOOL)enabled
 {
     _active = enabled;
-
+  
 
   if (!enabled) {
     // Disable any potential view controller (alert / filepicker / etc)
     [self dismissChildViewControllersIfNeeded];
-
+      
     // Disable all media playback when the webview is no longer active
       if (@available(iOS 15.0, *)) {
           [self.webView setAllMediaPlaybackSuspended:YES completionHandler:nil];
@@ -1772,6 +1780,17 @@ didFinishNavigation:(WKNavigation *)navigation
       }
   }
 }
+
+- (void)setJavaScriptEnabled:(BOOL)enabled {
+    _javaScriptEnabled = enabled;
+  
+  if (!enabled) {
+    _webView.configuration.preferences.javaScriptEnabled = NO;
+  } else {
+    _webView.configuration.preferences.javaScriptEnabled = YES;
+  }
+}
+
 
 - (void)goForward
 {
