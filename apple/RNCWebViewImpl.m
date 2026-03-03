@@ -135,6 +135,8 @@ RCTAutoInsetsProtocol>
 #else
   RCTUIColor * _savedBackgroundColor;
 #endif // !TARGET_OS_OSX
+  UIViewPropertyAnimator *_frameAnimator;
+  BOOL _didHeightChange;
   BOOL _savedHideKeyboardAccessoryView;
   BOOL _savedKeyboardDisplayRequiresUserAction;
 
@@ -178,6 +180,7 @@ RCTAutoInsetsProtocol>
     _savedKeyboardDisplayRequiresUserAction = YES;
     _active  = YES;
     _sandbox =  YES;
+    _didHeightChange = NO;
     _injectedJavaScript = nil;
     _injectedJavaScriptForMainFrameOnly = YES;
     _injectedJavaScriptBeforeContentLoaded = nil;
@@ -558,6 +561,7 @@ RCTAutoInsetsProtocol>
     _webView.menuItems = _menuItems;
     _webView.suppressMenuItems = _suppressMenuItems;
     _webView.scrollView.delegate = self;
+    _webView.scrollView.scrollIndicatorInsets = UIEdgeInsetsMake(16, 0, 16, 0);
 #endif // !TARGET_OS_OSX
     _webView.UIDelegate = self;
     _webView.navigationDelegate = self;
@@ -1156,11 +1160,38 @@ RCTAutoInsetsProtocol>
 {
   [super layoutSubviews];
 
-  // Ensure webview takes the position and dimensions of RNCWebViewImpl
-  _webView.frame = self.bounds;
-#if !TARGET_OS_OSX
+  CGRect newFrame = self.bounds;
+
+  if (!_didHeightChange) {
+    if (_webView.frame.size.height && _webView.frame.size.height != newFrame.size.height) {
+      _didHeightChange = YES;
+    }
+    _webView.frame = newFrame;
+  } else {
+    UIScrollView *scrollView = _webView.scrollView;
+    UIEdgeInsets scrollIndicatorInsets = UIEdgeInsetsMake(16, 0, 16, 0);
+    CGFloat currentOffset = scrollView.contentOffset.y;
+    BOOL isScrollViewBouncing = currentOffset <= 0;
+
+    _frameAnimator = [[UIViewPropertyAnimator alloc]
+                      initWithDuration:0
+                      curve:UIViewAnimationCurveLinear
+                      animations:^{
+      if (isScrollViewBouncing) {
+        self->_webView.frame = newFrame;
+        scrollView.contentOffset = CGPointMake(scrollView.contentOffset.x, currentOffset);
+        scrollView.scrollIndicatorInsets = scrollIndicatorInsets;
+      } else {
+        [UIView performWithoutAnimation:^{
+          self->_webView.frame = newFrame;
+        }];
+      }
+    }];
+
+    [_frameAnimator startAnimation];
+  }
+
   _webView.scrollView.contentInset = _contentInset;
-#endif // !TARGET_OS_OSX
 }
 
 - (NSMutableDictionary<NSString *, id> *)baseEvent
