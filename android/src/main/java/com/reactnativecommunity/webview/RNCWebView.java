@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.view.ActionMode;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -18,6 +19,7 @@ import android.webkit.WebViewClient;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.webkit.JavaScriptReplyProxy;
+import androidx.webkit.ScriptHandler;
 import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
@@ -43,6 +45,13 @@ import com.reactnativecommunity.webview.events.TopMessageEvent;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Scanner;
+import android.content.Context;
 
 import java.util.List;
 import java.util.Map;
@@ -68,6 +77,7 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
     protected boolean injectedJavaScriptForMainFrameOnly = true;
     protected boolean injectedJavaScriptBeforeContentLoadedForMainFrameOnly = true;
 
+    private boolean sandbox = true;
     protected boolean messagingEnabled = false;
     protected @Nullable
     String messagingModuleName;
@@ -80,6 +90,8 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
     protected boolean hasScrollEvent = false;
     protected boolean nestedScrollEnabled = false;
     protected ProgressChangedFilter progressChangedFilter;
+    protected JSONObject allowedDomains;
+    protected JSONObject allowedDomainsWithSubdomains;
 
     /**
      * WebView must be created with an context of the current activity
@@ -91,6 +103,42 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
         super(reactContext);
         mMessagingJSModule = ((ThemedReactContext) this.getContext()).getReactApplicationContext().getJSModule(RNCWebViewMessagingModule.class);
         progressChangedFilter = new ProgressChangedFilter();
+        try {
+            Context context = reactContext.getApplicationContext();
+            InputStream inputStream = context.getResources().openRawResource(R.raw.extras);
+            String jsonString = new Scanner(inputStream).useDelimiter("\\A").next();
+            allowedDomains = new JSONObject(jsonString).getJSONObject("allowedDomains");
+            allowedDomainsWithSubdomains = new JSONObject();
+            Iterator<String> keys = allowedDomains.keys();
+            while(keys.hasNext()) {
+                String domain = keys.next();
+                if (allowedDomains.get(domain) instanceof JSONObject) {
+                    JSONObject domainObj = (JSONObject) allowedDomains.get(domain);
+                    if (domainObj.has("subdomains")) {
+                        allowedDomainsWithSubdomains.put(domain, true);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public boolean isHostAllowed(String host) {
+        if(!sandbox) return true;
+        boolean exactMatch = allowedDomains.has(host);
+        if (!exactMatch){
+            String[] domainParts = host.split("\\.");
+            String topLevelDomain = domainParts[domainParts.length - 2] + '.' + domainParts[domainParts.length - 1];
+            return allowedDomainsWithSubdomains.has(topLevelDomain);
+        }
+        return true;
+    }
+
+    public void setSandbox(boolean enabled) {
+        sandbox = enabled;
+
+        setupWeb3DocumentStartJavaScript();
     }
 
     public void setBasicAuthCredential(RNCBasicAuthCredential credential) {
@@ -240,9 +288,64 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
         return this.mWebChromeClient;
     }
 
+    public boolean getSandbox() {
+        return this.sandbox;
+    }
+
     public @Nullable
     RNCWebViewClient getRNCWebViewClient() {
         return mRNCWebViewClient;
+    }
+
+    static String injectedJsBundle = null;
+
+    private  @Nullable String loadWeb3Provider() {
+        if (injectedJsBundle == null) {
+            InputStream stream = null;
+            try {
+                int res = ((ThemedReactContext) this.getContext()).getReactApplicationContext().getResources().getIdentifier("injected_js_bundle", "raw", ((ThemedReactContext) this.getContext()).getReactApplicationContext().getPackageName());
+                stream = ((ThemedReactContext) this.getContext()).getReactApplicationContext().getResources().openRawResource(res);
+                byte[] buffer = new byte[stream.available()];
+                stream.read(buffer);
+                String base64Content = Base64.encodeToString(buffer, Base64.NO_WRAP);
+                injectedJsBundle = new String(Base64.decode(base64Content.getBytes(StandardCharsets.UTF_8), Base64.DEFAULT));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            } finally {
+                if (stream != null) {
+                    try {
+                        stream.close();
+                    } catch (IOException ignored) {
+                    }
+                }
+            }
+        }
+
+        return injectedJsBundle;
+    }
+
+    public void injectWeb3Provider() {
+       String jsBundle = loadWeb3Provider();
+        if (jsBundle != null) {
+            evaluateJavascriptWithFallback(jsBundle);
+        }
+    }
+
+    private @Nullable ScriptHandler web3ScriptHandle = null;
+
+    private void setupWeb3DocumentStartJavaScript() {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            return;
+        }
+        if (sandbox && web3ScriptHandle != null) {
+            web3ScriptHandle.remove();
+            web3ScriptHandle = null;
+        } else if (!sandbox && web3ScriptHandle == null) {
+            String jsBundle = loadWeb3Provider();
+            if (jsBundle != null) {
+              web3ScriptHandle = WebViewCompat.addDocumentStartJavaScript(this, jsBundle, Collections.singleton("*"));
+            }
+        }
     }
 
     public boolean getMessagingEnabled() {

@@ -56,6 +56,7 @@ const WebViewComponent = forwardRef<{}, IOSWebViewProps>(
       originWhitelist = defaultOriginWhitelist,
       useSharedProcessPool = true,
       textInteractionEnabled = true,
+      sandbox = true,
       injectedJavaScript,
       injectedJavaScriptBeforeContentLoaded,
       injectedJavaScriptForMainFrameOnly = true,
@@ -235,6 +236,7 @@ const WebViewComponent = forwardRef<{}, IOSWebViewProps>(
         {...otherProps}
         fraudulentWebsiteWarningEnabled={fraudulentWebsiteWarningEnabled}
         javaScriptEnabled={javaScriptEnabled}
+        sandbox={sandbox}
         cacheEnabled={cacheEnabled}
         useSharedProcessPool={useSharedProcessPool}
         textInteractionEnabled={textInteractionEnabled}

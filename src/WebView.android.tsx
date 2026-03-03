@@ -69,6 +69,7 @@ const WebViewComponent = forwardRef<{}, AndroidWebViewProps>(
       scalesPageToFit = true,
       allowsFullscreenVideo = false,
       allowFileAccess = false,
+      sandbox = true,
       saveFormDataDisabled = false,
       cacheEnabled = true,
       androidLayerType = 'none',
@@ -287,6 +288,7 @@ const WebViewComponent = forwardRef<{}, AndroidWebViewProps>(
         messagingEnabled={typeof onMessageProp === 'function'}
         messagingModuleName={messagingModuleName}
         hasOnScroll={!!otherProps.onScroll}
+        sandbox={sandbox}
         onLoadingError={onLoadingError}
         onLoadingSubResourceError={onLoadingSubResourceError}
         onLoadingFinish={onLoadingFinish}

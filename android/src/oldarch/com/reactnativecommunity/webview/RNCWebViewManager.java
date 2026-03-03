@@ -179,6 +179,11 @@ public class RNCWebViewManager extends ViewGroupManager<RNCWebViewWrapper> {
         mRNCWebViewManagerImpl.setMediaPlaybackRequiresUserAction(view, value);
     }
 
+    @ReactProp(name = "sandbox")
+    public void setSandbox(RNCWebViewWrapper view, boolean value) {
+        mRNCWebViewManagerImpl.setSandbox(view, value);
+    }
+
     @ReactProp(name = "messagingEnabled")
     public void setMessagingEnabled(RNCWebViewWrapper view, boolean value) {
         mRNCWebViewManagerImpl.setMessagingEnabled(view, value);

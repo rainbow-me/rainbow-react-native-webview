@@ -493,6 +493,11 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
         view.settings.saveFormData = false;
     }
 
+    fun setSandbox(viewWrapper: RNCWebViewWrapper, value: Boolean) {
+        val view = viewWrapper.webView
+        view.sandbox = value
+    }
+
     fun setInjectedJavaScript(viewWrapper: RNCWebViewWrapper, injectedJavaScript: String?) {
         val view = viewWrapper.webView
         view.injectedJS = injectedJavaScript
