@@ -417,6 +417,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
                 if (previousUrl != null && previousUrl == url) {
                     return
                 }
+
                 if (source.hasKey("method")) {
                     val method = source.getString("method")
                     if (method.equals(HTTP_METHOD_POST, ignoreCase = true)) {

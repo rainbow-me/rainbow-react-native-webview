@@ -177,9 +177,9 @@ namespace winrt::ReactNativeWebView::implementation {
         commands.Append(L"reload");
         commands.Append(L"stopLoading");
         commands.Append(L"injectJavaScript");
+        commands.Append(L"setActive");
         commands.Append(L"postMessage");
         commands.Append(L"loadUrl");
-        commands.Append(L"setActive");
         return commands.GetView();
     }
 

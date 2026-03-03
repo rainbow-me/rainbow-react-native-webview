@@ -18,10 +18,10 @@ type WebViewCommands =
   | 'stopLoading'
   | 'postMessage'
   | 'injectJavaScript'
+  | 'setActive'
   | 'loadUrl'
   | 'requestFocus'
-  | 'clearCache'
-  | 'setActive';
+  | 'clearCache';
 
 type AndroidWebViewCommands = 'clearHistory' | 'clearFormData';
 

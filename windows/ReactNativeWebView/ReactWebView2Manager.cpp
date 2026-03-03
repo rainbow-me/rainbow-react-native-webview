@@ -141,12 +141,12 @@ namespace winrt::ReactNativeWebView::implementation {
         commands.Append(L"goBack");
         commands.Append(L"reload");
         commands.Append(L"stopLoading");
+        commands.Append(L"setActive");
         commands.Append(L"injectJavaScript");
         commands.Append(L"requestFocus");
         commands.Append(L"clearCache");
         commands.Append(L"postMessage");
         commands.Append(L"loadUrl");
-        commands.Append(L"setActive");
         return commands.GetView();
     }
 

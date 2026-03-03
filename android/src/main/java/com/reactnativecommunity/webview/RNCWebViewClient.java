@@ -93,6 +93,7 @@ public class RNCWebViewClient extends WebViewClient {
       mLastLoadFailed = false;
 
       RNCWebView reactWebView = (RNCWebView) webView;
+
       reactWebView.callInjectedJavaScriptBeforeContentLoaded();
     }
 
@@ -100,11 +101,11 @@ public class RNCWebViewClient extends WebViewClient {
     public boolean shouldOverrideUrlLoading(WebView view, String url) {
         final RNCWebView rncWebView = (RNCWebView) view;
         final boolean isJsDebugging = rncWebView.getReactApplicationContext().getJavaScriptContextHolder().get() == 0;
-
         if(!rncWebView.isHostAllowed(Uri.parse(url).getHost())){
             rncWebView.stopLoading();
             return true;
         }
+
         if (!isJsDebugging && rncWebView.mMessagingJSModule != null) {
             final Pair<Double, AtomicReference<RNCWebViewModuleImpl.ShouldOverrideUrlLoadingLock.ShouldOverrideCallbackState>> lock = RNCWebViewModuleImpl.shouldOverrideUrlLoadingLock.getNewLock();
             final double lockIdentifier = lock.first;
