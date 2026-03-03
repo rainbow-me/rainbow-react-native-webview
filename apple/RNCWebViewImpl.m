@@ -350,6 +350,49 @@ RCTAutoInsetsProtocol>
     return wkWebViewConfig;
 }
 
+- (void)injectUnderPageBackgroundColor:(WKWebView *)webView
+{
+  UIColor *underPageBackgroundColor = nil;
+  NSString *colorString;
+
+  if ([self->_webView respondsToSelector:@selector(underPageBackgroundColor)]) {
+    underPageBackgroundColor = self->_webView.underPageBackgroundColor;
+  }
+  if (underPageBackgroundColor) {
+    colorString = [self hexStringFromColor:underPageBackgroundColor];
+  } else {
+    // Use fallback color based on system theme (rarely needed, if ever)
+    if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+      colorString = @"#191A1C";
+    } else {
+      colorString = @"#FFFFFF";
+    }
+  }
+
+  // Create a script to send the color to React Native
+  NSString *colorInjectionScript = [NSString stringWithFormat:
+                                    @"window.ReactNativeWebView.postMessage(JSON.stringify({ topic: 'injectedUnderPageBackgroundColor', payload: { underPageBackgroundColor: '%@' } }));", colorString];
+  // Inject the script
+  [webView evaluateJavaScript:colorInjectionScript completionHandler:nil];
+}
+
+- (NSString *)hexStringFromColor:(UIColor *)color
+{
+  CGFloat r = 0, g = 0, b = 0, a = 0;
+  if ([color respondsToSelector:@selector(getRed:green:blue:alpha:)]) {
+    [color getRed:&r green:&g blue:&b alpha:&a];
+  } else {
+    const CGFloat *components = CGColorGetComponents(color.CGColor);
+    r = components[0];
+    g = components[1];
+    b = components[2];
+  }
+  int red = (int)(r * 255.0);
+  int green = (int)(g * 255.0);
+  int blue = (int)(b * 255.0);
+  return [NSString stringWithFormat:@"#%02X%02X%02X", red, green, blue];
+}
+
 - (void)tappedMenuItem:(NSString *)eventType
 {
   // Get the selected text
@@ -565,6 +608,7 @@ RCTAutoInsetsProtocol>
 #endif // !TARGET_OS_OSX
     _webView.UIDelegate = self;
     _webView.navigationDelegate = self;
+    [_webView addObserver:self forKeyPath:@"underPageBackgroundColor" options:NSKeyValueObservingOptionNew context:nil];
 #if !TARGET_OS_OSX
     if (_pullToRefreshEnabled) {
       [self addPullToRefreshControl];
@@ -655,6 +699,7 @@ RCTAutoInsetsProtocol>
     [_webView.configuration.userContentController removeScriptMessageHandlerForName:HistoryShimName];
     [_webView.configuration.userContentController removeScriptMessageHandlerForName:MessageHandlerName];
     [_webView removeObserver:self forKeyPath:@"estimatedProgress"];
+    [_webView removeObserver:self forKeyPath:@"underPageBackgroundColor"];
     [_webView removeFromSuperview];
     if (@available(iOS 15.0, macOS 12.0, *)) {
         [_webView pauseAllMediaPlaybackWithCompletionHandler:nil];
@@ -745,7 +790,10 @@ RCTAutoInsetsProtocol>
       [event addEntriesFromDictionary:@{@"progress":[NSNumber numberWithDouble:self.webView.estimatedProgress]}];
       _onLoadingProgress(event);
     }
-  }else{
+  } else if ([keyPath isEqualToString:@"underPageBackgroundColor"] && object == self.webView) {
+    UIColor *newColor = change[NSKeyValueChangeNewKey];
+    if (newColor) [self injectUnderPageBackgroundColor:_webView];
+  } else {
     [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
   }
 }
@@ -1597,6 +1645,22 @@ RCTAutoInsetsProtocol>
     }];
     _onLoadingError(event);
   }
+}
+
+- (void)webView:(WKWebView *)webView didStartProvisionalNavigation:(WKNavigation *)navigation
+{
+  // Set opaque to NO to prevent white flash during initial load
+  _webView.opaque = NO;
+  // Clear the previous underPageBackgroundColor
+  _webView.underPageBackgroundColor = nil;
+}
+
+- (void)webView:(WKWebView *)webView didCommitNavigation:(WKNavigation *)navigation
+{
+  // Set opaque to YES when content starts loading
+  _webView.opaque = YES;
+  // Ensure background color is set
+  _webView.backgroundColor = _savedBackgroundColor;
 }
 
 - (void)evaluateJS:(NSString *)js
