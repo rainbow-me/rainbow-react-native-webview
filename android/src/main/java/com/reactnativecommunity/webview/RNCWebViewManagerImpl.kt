@@ -40,6 +40,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
     private var mWebViewConfig: RNCWebViewConfig = RNCWebViewConfig { webView: WebView? -> }
     private var mAllowsFullscreenVideo = false
     private var mAllowsProtectedMedia = false
+    private var mActive = false;
     private var mDownloadingMessage: String? = null
     private var mLackPermissionToDownloadMessage: String? = null
     private var mHasOnOpenWindowEvent = false
@@ -290,6 +291,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
     val COMMAND_INJECT_JAVASCRIPT = 6
     val COMMAND_LOAD_URL = 7
     val COMMAND_FOCUS = 8
+    val COMMAND_SET_ACTIVE = 9
 
     // android commands
     val COMMAND_CLEAR_FORM_DATA = 1000
@@ -304,6 +306,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
         .put("stopLoading", COMMAND_STOP_LOADING)
         .put("postMessage", COMMAND_POST_MESSAGE)
         .put("injectJavaScript", COMMAND_INJECT_JAVASCRIPT)
+        .put("setActive", COMMAND_SET_ACTIVE)
         .put("loadUrl", COMMAND_LOAD_URL)
         .put("requestFocus", COMMAND_FOCUS)
         .put("clearFormData", COMMAND_CLEAR_FORM_DATA)
@@ -337,6 +340,9 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
           )
         } catch (e: JSONException) {
           throw RuntimeException(e)
+        }
+        "setActive" -> {
+            this.mActive = args.getBoolean(0)
         }
         "injectJavaScript" -> webView.evaluateJavascriptWithFallback(args.getString(0))
         "loadUrl" -> {

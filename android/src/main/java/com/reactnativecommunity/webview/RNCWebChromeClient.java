@@ -12,6 +12,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.ConsoleMessage;
 import android.webkit.GeolocationPermissions;
+import android.webkit.JsPromptResult;
+import android.webkit.JsResult;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -144,6 +146,8 @@ public class RNCWebChromeClient extends WebChromeClient implements LifecycleEven
 
     @Override
     public void onPermissionRequest(final PermissionRequest request) {
+        // Ignore requests while not active
+        if(!this.mWebView.active) return;
 
         grantedPermissions = new ArrayList<>();
 
@@ -195,6 +199,8 @@ public class RNCWebChromeClient extends WebChromeClient implements LifecycleEven
 
     @Override
     public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+        // Ignore requests while not active
+        if(!this.mWebView.active) return;
 
         if (ContextCompat.checkSelfPermission(this.mWebView.getThemedReactContext(), Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -223,6 +229,9 @@ public class RNCWebChromeClient extends WebChromeClient implements LifecycleEven
     }
 
     private synchronized void requestPermissions(List<String> permissions) {
+        // Ignore requests while not active
+        if(!this.mWebView.active) return;
+
 
         /*
          * If permissions request dialog is displayed on the screen and another request is sent to the
@@ -250,6 +259,8 @@ public class RNCWebChromeClient extends WebChromeClient implements LifecycleEven
 
 
     private PermissionListener webviewPermissionsListener = (requestCode, permissions, grantResults) -> {
+        // Ignore requests while not active
+        if (!this.mWebView.active) return false;
 
         permissionsRequestShown = false;
 
@@ -317,15 +328,21 @@ public class RNCWebChromeClient extends WebChromeClient implements LifecycleEven
     };
 
     protected void openFileChooser(ValueCallback<Uri> filePathCallback, String acceptType) {
-      this.mWebView.getThemedReactContext().getNativeModule(RNCWebViewModule.class).startPhotoPickerIntent(filePathCallback, acceptType);
+        // Ignore requests while not active
+        if(!this.mWebView.active) return;
+        this.mWebView.getThemedReactContext().getNativeModule(RNCWebViewModule.class).startPhotoPickerIntent(filePathCallback, acceptType);
     }
 
     protected void openFileChooser(ValueCallback<Uri> filePathCallback) {
-      this.mWebView.getThemedReactContext().getNativeModule(RNCWebViewModule.class).startPhotoPickerIntent(filePathCallback, "");
+        // Ignore requests while not active
+        if(!this.mWebView.active) return;
+        this.mWebView.getThemedReactContext().getNativeModule(RNCWebViewModule.class).startPhotoPickerIntent(filePathCallback, "");
     }
 
     protected void openFileChooser(ValueCallback<Uri> filePathCallback, String acceptType, String capture) {
-      this.mWebView.getThemedReactContext().getNativeModule(RNCWebViewModule.class).startPhotoPickerIntent(filePathCallback, acceptType);
+        // Ignore requests while not active
+        if(!this.mWebView.active) return;
+        this.mWebView.getThemedReactContext().getNativeModule(RNCWebViewModule.class).startPhotoPickerIntent(filePathCallback, acceptType);
     }
 
     @Override
@@ -340,6 +357,39 @@ public class RNCWebChromeClient extends WebChromeClient implements LifecycleEven
     public void onHostResume() {
         if (mVideoView != null && mVideoView.getSystemUiVisibility() != FULLSCREEN_SYSTEM_UI_VISIBILITY) {
             mVideoView.setSystemUiVisibility(FULLSCREEN_SYSTEM_UI_VISIBILITY);
+        }
+    }
+
+    // Override alert dialog
+    @Override
+    public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
+        if (this.mWebView.active) {
+            return super.onJsAlert(view, url, message, result);
+        } else {
+            result.cancel(); // Block the alert
+            return true;
+        }
+    }
+
+    // Override confirm dialog
+    @Override
+    public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
+        if (this.mWebView.active) {
+            return super.onJsConfirm(view, url, message, result);
+        } else {
+            result.cancel(); // Block the alert
+            return true;
+        }
+    }
+
+    // Override prompt dialog
+    @Override
+    public boolean onJsPrompt(WebView view, String url, String message, String defaultValue, JsPromptResult result) {
+        if (this.mWebView.active) {
+            return super.onJsPrompt(view, url, message, defaultValue, result);
+        } else {
+            result.cancel(); // Block the alert
+            return true;
         }
     }
 

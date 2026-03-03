@@ -462,6 +462,11 @@ public class RNCWebViewManager extends ViewGroupManager<RNCWebViewWrapper>
   }
 
   @Override
+  public void setActive(RNCWebViewWrapper view, boolean enabled) {
+      view.getWebView().active = enabled;
+  }
+
+  @Override
   public void requestFocus(RNCWebViewWrapper view) {
       view.requestFocus();
   }

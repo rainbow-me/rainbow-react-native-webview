@@ -95,6 +95,7 @@ shouldStartLoadForRequest:(NSMutableDictionary<NSString *, id> *)request
 @property (nonatomic, copy) NSString * _Nullable userAgent;
 @property (nonatomic, copy) NSString * _Nullable applicationNameForUserAgent;
 @property (nonatomic, assign) BOOL cacheEnabled;
+@property (nonatomic, assign) BOOL active;
 @property (nonatomic, assign) BOOL javaScriptEnabled;
 @property (nonatomic, assign) BOOL javaScriptCanOpenWindowsAutomatically;
 @property (nonatomic, assign) BOOL allowFileAccessFromFileURLs;
@@ -142,6 +143,7 @@ shouldStartLoadForRequest:(NSMutableDictionary<NSString *, id> *)request
 + (void)setClientAuthenticationCredential:(nullable NSURLCredential*)credential;
 + (void)setCustomCertificatesForHost:(nullable NSDictionary *)certificates;
 - (void)postMessage:(NSString *_Nullable)message;
+- (void)setActive:(BOOL) enabled;
 - (void)injectJavaScript:(NSString *_Nullable)script;
 - (void)goForward;
 - (void)goBack;

@@ -307,6 +307,7 @@ export interface NativeCommands {
     javascript: string
   ) => void;
   requestFocus: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
+  setActive: (viewRef: React.ElementRef<HostComponent<NativeProps>>, enabled: boolean) => void;
   postMessage: (
     viewRef: React.ElementRef<HostComponent<NativeProps>>,
     data: string
@@ -340,6 +341,7 @@ export const Commands = codegenNativeCommands<NativeCommands>({
     'clearFormData',
     'clearCache',
     'clearHistory',
+    'setActive',
   ],
 });
 

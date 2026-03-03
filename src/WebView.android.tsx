@@ -173,6 +173,7 @@ const WebViewComponent = forwardRef<{}, AndroidWebViewProps>(
         injectJavaScript: (data: string) =>
           webViewRef.current &&
           Commands.injectJavaScript(webViewRef.current, data),
+        setActive: (enabled: boolean) => webViewRef.current && Commands.setActive(webViewRef.current, enabled),
         requestFocus: () =>
           webViewRef.current && Commands.requestFocus(webViewRef.current),
         clearFormData: () =>
