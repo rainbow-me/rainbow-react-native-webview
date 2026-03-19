@@ -94,6 +94,15 @@ public class RNCWebViewClient extends WebViewClient {
 
       RNCWebView reactWebView = (RNCWebView) webView;
 
+      // Block initial loads to non-allowed domains (shouldOverrideUrlLoading
+      // doesn't fire for the initial source URL)
+      String host = Uri.parse(url).getHost();
+      if (host != null && !reactWebView.isHostAllowed(host)) {
+        reactWebView.stopLoading();
+        this.onReceivedError(webView, -1, "Navigation blocked by sandbox: " + url, url);
+        return;
+      }
+
       reactWebView.callInjectedJavaScriptBeforeContentLoaded();
     }
 
@@ -103,6 +112,7 @@ public class RNCWebViewClient extends WebViewClient {
         final boolean isJsDebugging = rncWebView.getReactApplicationContext().getJavaScriptContextHolder().get() == 0;
         if(!rncWebView.isHostAllowed(Uri.parse(url).getHost())){
             rncWebView.stopLoading();
+            this.onReceivedError(view, -1, "Navigation blocked by sandbox: " + url, url);
             return true;
         }
 
