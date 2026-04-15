@@ -56,6 +56,7 @@ const WebViewComponent = forwardRef<{}, IOSWebViewProps>(
       originWhitelist = defaultOriginWhitelist,
       useSharedProcessPool = true,
       textInteractionEnabled = true,
+      sandbox = true,
       injectedJavaScript,
       injectedJavaScriptBeforeContentLoaded,
       injectedJavaScriptForMainFrameOnly = true,
@@ -154,6 +155,7 @@ const WebViewComponent = forwardRef<{}, IOSWebViewProps>(
         injectJavaScript: (data: string) =>
           webViewRef.current &&
           Commands.injectJavaScript(webViewRef.current, data),
+        setActive: (enabled: boolean) => webViewRef.current && Commands.setActive(webViewRef.current, enabled),
         requestFocus: () =>
           webViewRef.current && Commands.requestFocus(webViewRef.current),
         clearCache: (includeDiskFiles: boolean) =>
@@ -234,6 +236,7 @@ const WebViewComponent = forwardRef<{}, IOSWebViewProps>(
         {...otherProps}
         fraudulentWebsiteWarningEnabled={fraudulentWebsiteWarningEnabled}
         javaScriptEnabled={javaScriptEnabled}
+        sandbox={sandbox}
         cacheEnabled={cacheEnabled}
         useSharedProcessPool={useSharedProcessPool}
         textInteractionEnabled={textInteractionEnabled}

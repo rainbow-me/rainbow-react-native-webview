@@ -141,6 +141,7 @@ namespace winrt::ReactNativeWebView::implementation {
         commands.Append(L"goBack");
         commands.Append(L"reload");
         commands.Append(L"stopLoading");
+        commands.Append(L"setActive");
         commands.Append(L"injectJavaScript");
         commands.Append(L"requestFocus");
         commands.Append(L"clearCache");
@@ -178,6 +179,9 @@ namespace winrt::ReactNativeWebView::implementation {
         }
         else if (commandId == L"injectJavaScript") {
             webView.ExecuteScriptAsync(winrt::to_hstring(commandArgs[0].AsString()));
+        |
+        else if (commandId == L"setActive") {
+            webView.ExecuteScriptAsync(commandArgs[0].AsBoolean());
         }
         else if (commandId == L"requestFocus") {
             FocusManager::TryFocusAsync(webView, FocusState::Programmatic);

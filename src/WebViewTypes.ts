@@ -18,6 +18,7 @@ type WebViewCommands =
   | 'stopLoading'
   | 'postMessage'
   | 'injectJavaScript'
+  | 'setActive'
   | 'loadUrl'
   | 'requestFocus'
   | 'clearCache';
@@ -365,6 +366,7 @@ export interface WindowsNativeWebViewProps extends CommonNativeWebViewProps {
 }
 
 export interface WindowsWebViewProps extends WebViewSharedProps {
+  sandbox?: boolean;
   /**
    * Boolean value that detenmines whether the web view should use the new chromium based edge webview.
    */
@@ -1171,6 +1173,7 @@ export interface AndroidWebViewProps extends WebViewSharedProps {
 }
 
 export interface WebViewSharedProps extends ViewProps {
+  sandbox?: boolean;
   /**
    * Loads static html or a uri (with optional headers) in the WebView.
    */

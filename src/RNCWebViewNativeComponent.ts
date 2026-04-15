@@ -269,6 +269,7 @@ export interface NativeProps extends ViewProps {
   webviewDebuggingEnabled?: boolean;
   mediaPlaybackRequiresUserAction?: WithDefault<boolean, true>;
   messagingEnabled: boolean;
+  sandbox?: WithDefault<boolean, true>;
   onLoadingError: DirectEventHandler<WebViewErrorEvent>;
   onLoadingSubResourceError: DirectEventHandler<WebViewErrorEvent>;
   onLoadingFinish: DirectEventHandler<WebViewNavigationEvent>;
@@ -306,6 +307,7 @@ export interface NativeCommands {
     viewRef: React.ElementRef<HostComponent<NativeProps>>,
     javascript: string
   ) => void;
+  setActive: (viewRef: React.ElementRef<HostComponent<NativeProps>>, enabled: boolean) => void;
   requestFocus: (viewRef: React.ElementRef<HostComponent<NativeProps>>) => void;
   postMessage: (
     viewRef: React.ElementRef<HostComponent<NativeProps>>,
@@ -340,6 +342,7 @@ export const Commands = codegenNativeCommands<NativeCommands>({
     'clearFormData',
     'clearCache',
     'clearHistory',
+    'setActive',
   ],
 });
 

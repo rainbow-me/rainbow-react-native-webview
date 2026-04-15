@@ -69,6 +69,7 @@ const WebViewComponent = forwardRef<{}, AndroidWebViewProps>(
       scalesPageToFit = true,
       allowsFullscreenVideo = false,
       allowFileAccess = false,
+      sandbox = true,
       saveFormDataDisabled = false,
       cacheEnabled = true,
       androidLayerType = 'none',
@@ -173,6 +174,7 @@ const WebViewComponent = forwardRef<{}, AndroidWebViewProps>(
         injectJavaScript: (data: string) =>
           webViewRef.current &&
           Commands.injectJavaScript(webViewRef.current, data),
+        setActive: (enabled: boolean) => webViewRef.current && Commands.setActive(webViewRef.current, enabled),
         requestFocus: () =>
           webViewRef.current && Commands.requestFocus(webViewRef.current),
         clearFormData: () =>
@@ -286,6 +288,7 @@ const WebViewComponent = forwardRef<{}, AndroidWebViewProps>(
         messagingEnabled={typeof onMessageProp === 'function'}
         messagingModuleName={messagingModuleName}
         hasOnScroll={!!otherProps.onScroll}
+        sandbox={sandbox}
         onLoadingError={onLoadingError}
         onLoadingSubResourceError={onLoadingSubResourceError}
         onLoadingFinish={onLoadingFinish}

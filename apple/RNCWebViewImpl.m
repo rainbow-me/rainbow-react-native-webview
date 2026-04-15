@@ -132,6 +132,8 @@ RCTAutoInsetsProtocol>
 {
 #if !TARGET_OS_OSX
   UIColor * _savedBackgroundColor;
+  UIViewPropertyAnimator *_frameAnimator;
+  BOOL _didHeightChange;
 #else
   RCTUIColor * _savedBackgroundColor;
 #endif // !TARGET_OS_OSX
@@ -176,6 +178,9 @@ RCTAutoInsetsProtocol>
     _autoManageStatusBarEnabled = YES;
     _contentInset = UIEdgeInsetsZero;
     _savedKeyboardDisplayRequiresUserAction = YES;
+    _didHeightChange = NO;
+    _active  = YES;
+    _sandbox =  YES;
     _injectedJavaScript = nil;
     _injectedJavaScriptForMainFrameOnly = YES;
     _injectedJavaScriptBeforeContentLoaded = nil;
@@ -258,6 +263,18 @@ RCTAutoInsetsProtocol>
 // Listener for long presses
 - (void)startLongPress:(UILongPressGestureRecognizer *)pressSender
 {
+    // Always recognize the long press gesture
+    if (pressSender.state == UIGestureRecognizerStateBegan) {
+        // Indicate the gesture is being handled
+        [pressSender setCancelsTouchesInView:YES];
+    }
+
+    // Handle the end or cancellation of the gesture
+    if (pressSender.state == UIGestureRecognizerStateEnded || pressSender.state == UIGestureRecognizerStateCancelled) {
+        // Prevent further gesture handling by the scroll view
+        [pressSender setCancelsTouchesInView:NO];
+    }
+
     if (pressSender.state != UIGestureRecognizerStateEnded || !self.menuItems) {
         return;
     }
@@ -314,6 +331,66 @@ RCTAutoInsetsProtocol>
   if (@available(iOS 11.0, *)) {
     [self.webView.configuration.websiteDataStore.httpCookieStore removeObserver:self];
   }
+}
+
+// Helper to read and convert the JS bundle
+- (WKWebViewConfiguration *)injectWeb3Provider: (WKWebViewConfiguration *)wkWebViewConfig {
+    NSString *filePath = [[NSBundle mainBundle] pathForResource:@"InjectedJSBundle" ofType:@"js"];
+    NSError *error = nil;
+    NSString *jsBundle = [NSString stringWithContentsOfFile:filePath encoding:NSUTF8StringEncoding error:&error];
+    if (error) {
+        NSLog(@"[RNCWebView: injectWeb3Provider] Error reading JS bundle file: %@", error.localizedDescription);
+        return wkWebViewConfig;
+    }
+    WKUserScript *userScript = [[WKUserScript alloc]
+                                initWithSource:jsBundle
+                                injectionTime:WKUserScriptInjectionTimeAtDocumentStart
+                                forMainFrameOnly:YES];
+    [wkWebViewConfig.userContentController addUserScript:userScript];
+    return wkWebViewConfig;
+}
+
+- (void)injectUnderPageBackgroundColor:(WKWebView *)webView
+{
+  UIColor *underPageBackgroundColor = nil;
+  NSString *colorString;
+
+  if ([self->_webView respondsToSelector:@selector(underPageBackgroundColor)]) {
+    underPageBackgroundColor = self->_webView.underPageBackgroundColor;
+  }
+  if (underPageBackgroundColor) {
+    colorString = [self hexStringFromColor:underPageBackgroundColor];
+  } else {
+    // Use fallback color based on system theme (rarely needed, if ever)
+    if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+      colorString = @"#191A1C";
+    } else {
+      colorString = @"#FFFFFF";
+    }
+  }
+  
+  // Create a script to send the color to React Native
+  NSString *colorInjectionScript = [NSString stringWithFormat:
+                                    @"window.ReactNativeWebView.postMessage(JSON.stringify({ topic: 'injectedUnderPageBackgroundColor', payload: { underPageBackgroundColor: '%@' } }));", colorString];
+  // Inject the script
+  [webView evaluateJavaScript:colorInjectionScript completionHandler:nil];
+}
+
+- (NSString *)hexStringFromColor:(UIColor *)color
+{
+  CGFloat r = 0, g = 0, b = 0, a = 0;
+  if ([color respondsToSelector:@selector(getRed:green:blue:alpha:)]) {
+    [color getRed:&r green:&g blue:&b alpha:&a];
+  } else {
+    const CGFloat *components = CGColorGetComponents(color.CGColor);
+    r = components[0];
+    g = components[1];
+    b = components[2];
+  }
+  int red = (int)(r * 255.0);
+  int green = (int)(g * 255.0);
+  int blue = (int)(b * 255.0);
+  return [NSString stringWithFormat:@"#%02X%02X%02X", red, green, blue];
 }
 
 - (void)tappedMenuItem:(NSString *)eventType
@@ -426,8 +503,15 @@ RCTAutoInsetsProtocol>
   WKPreferences *prefs = [[WKPreferences alloc]init];
   BOOL _prefsUsed = NO;
   if (!_javaScriptEnabled) {
-    prefs.javaScriptEnabled = NO;
-    _prefsUsed = YES;
+      prefs.javaScriptEnabled = NO;
+      WKWebpagePreferences *webpagePreferences = [[WKWebpagePreferences alloc] init];
+      wkWebViewConfig.defaultWebpagePreferences = webpagePreferences;
+      if (@available(iOS 14.0, *)) {
+          webpagePreferences.allowsContentJavaScript = NO;
+      } else {
+          // Fallback on earlier versions
+      }
+      _prefsUsed = YES;
   }
 #if defined(__IPHONE_OS_VERSION_MAX_ALLOWED) && __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000 /* iOS 13 */
   if (@available(iOS 13.0, *)) {
@@ -509,6 +593,11 @@ RCTAutoInsetsProtocol>
     wkWebViewConfig.applicationNameForUserAgent = [NSString stringWithFormat:@"%@ %@", wkWebViewConfig.applicationNameForUserAgent, _applicationNameForUserAgent];
   }
 
+  // Load and inject the ethereum provider JavaScript bundle (only for the dapp browser instance)
+  if(!_sandbox){
+      return [self injectWeb3Provider: wkWebViewConfig];
+  }
+
   return wkWebViewConfig;
 }
 
@@ -545,9 +634,11 @@ RCTAutoInsetsProtocol>
     }
 
     _webView.scrollView.directionalLockEnabled = _directionalLockEnabled;
+    _webView.scrollView.scrollIndicatorInsets = UIEdgeInsetsMake(16, 0, 16, 0);
 #endif // !TARGET_OS_OSX
     _webView.allowsLinkPreview = _allowsLinkPreview;
     [_webView addObserver:self forKeyPath:@"estimatedProgress" options:NSKeyValueObservingOptionOld | NSKeyValueObservingOptionNew context:nil];
+    [_webView addObserver:self forKeyPath:@"underPageBackgroundColor" options:NSKeyValueObservingOptionNew context:nil];
     _webView.allowsBackForwardNavigationGestures = _allowsBackForwardNavigationGestures;
 
     _webView.customUserAgent = _userAgent;
@@ -579,15 +670,13 @@ RCTAutoInsetsProtocol>
 
 #if !TARGET_OS_OSX
   // Allow this object to recognize gestures
-  if (self.menuItems != nil) {
-    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(startLongPress:)];
-    longPress.delegate = self;
+  UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(startLongPress:)];
+  longPress.delegate = self;
 
-    longPress.minimumPressDuration = 0.4f;
-    longPress.numberOfTouchesRequired = 1;
-    longPress.cancelsTouchesInView = YES;
-    [self addGestureRecognizer:longPress];
-  }
+  longPress.minimumPressDuration = 0.4f;
+  longPress.numberOfTouchesRequired = 1;
+  longPress.cancelsTouchesInView = YES;
+  [self addGestureRecognizer:longPress];
 #endif // !TARGET_OS_OSX
 }
 
@@ -617,6 +706,7 @@ RCTAutoInsetsProtocol>
     [_webView.configuration.userContentController removeScriptMessageHandlerForName:HistoryShimName];
     [_webView.configuration.userContentController removeScriptMessageHandlerForName:MessageHandlerName];
     [_webView removeObserver:self forKeyPath:@"estimatedProgress"];
+    [_webView removeObserver:self forKeyPath:@"underPageBackgroundColor"];
     [_webView removeFromSuperview];
     if (@available(iOS 15.0, macOS 12.0, *)) {
         [_webView pauseAllMediaPlaybackWithCompletionHandler:nil];
@@ -707,7 +797,10 @@ RCTAutoInsetsProtocol>
       [event addEntriesFromDictionary:@{@"progress":[NSNumber numberWithDouble:self.webView.estimatedProgress]}];
       _onLoadingProgress(event);
     }
-  }else{
+  } else if ([keyPath isEqualToString:@"underPageBackgroundColor"] && object == self.webView) {
+    UIColor *newColor = change[NSKeyValueChangeNewKey];
+    if (newColor) [self injectUnderPageBackgroundColor:_webView];
+  } else {
     [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
   }
 }
@@ -1122,11 +1215,38 @@ RCTAutoInsetsProtocol>
 {
   [super layoutSubviews];
 
-  // Ensure webview takes the position and dimensions of RNCWebViewImpl
-  _webView.frame = self.bounds;
-#if !TARGET_OS_OSX
+  CGRect newFrame = self.bounds;
+
+  if (!_didHeightChange) {
+    if (_webView.frame.size.height && _webView.frame.size.height != newFrame.size.height) {
+      _didHeightChange = YES;
+    }
+    _webView.frame = newFrame;
+  } else {
+    UIScrollView *scrollView = _webView.scrollView;
+    UIEdgeInsets scrollIndicatorInsets = UIEdgeInsetsMake(16, 0, 16, 0);
+    CGFloat currentOffset = scrollView.contentOffset.y;
+    BOOL isScrollViewBouncing = currentOffset <= 0;
+    
+    _frameAnimator = [[UIViewPropertyAnimator alloc]
+                      initWithDuration:0
+                      curve:UIViewAnimationCurveLinear
+                      animations:^{
+      if (isScrollViewBouncing) {
+        self->_webView.frame = newFrame;
+        scrollView.contentOffset = CGPointMake(scrollView.contentOffset.x, currentOffset);
+        scrollView.scrollIndicatorInsets = scrollIndicatorInsets;
+      } else {
+        [UIView performWithoutAnimation:^{
+          self->_webView.frame = newFrame;
+        }];
+      }
+    }];
+
+    [_frameAnimator startAnimation];
+  }
+
   _webView.scrollView.contentInset = _contentInset;
-#endif // !TARGET_OS_OSX
 }
 
 - (NSMutableDictionary<NSString *, id> *)baseEvent
@@ -1202,11 +1322,15 @@ RCTAutoInsetsProtocol>
 - (void)webView:(WKWebView *)webView runJavaScriptAlertPanelWithMessage:(NSString *)message initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(void))completionHandler
 {
 #if !TARGET_OS_OSX
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:message preferredStyle:UIAlertControllerStyleAlert];
-  [alert addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-    completionHandler();
-  }]];
-  [[self topViewController] presentViewController:alert animated:YES completion:NULL];
+    if(_active){
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:message preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            completionHandler();
+        }]];
+        [[self topViewController] presentViewController:alert animated:YES completion:NULL];
+    } else {
+        completionHandler();
+    }
 #else
   NSAlert *alert = [[NSAlert alloc] init];
   [alert setMessageText:message];
@@ -1246,20 +1370,24 @@ RCTAutoInsetsProtocol>
  */
 - (void)webView:(WKWebView *)webView runJavaScriptTextInputPanelWithPrompt:(NSString *)prompt defaultText:(NSString *)defaultText initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(NSString *))completionHandler{
 #if !TARGET_OS_OSX
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:prompt preferredStyle:UIAlertControllerStyleAlert];
-  [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-    textField.text = defaultText;
-  }];
-  UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-    completionHandler([[alert.textFields lastObject] text]);
-  }];
-  [alert addAction:okAction];
-  UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) {
-    completionHandler(nil);
-  }];
-  [alert addAction:cancelAction];
-  alert.preferredAction = okAction;
-  [[self topViewController] presentViewController:alert animated:YES completion:NULL];
+   if(_active){
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:prompt preferredStyle:UIAlertControllerStyleAlert];
+        [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+            textField.text = defaultText;
+        }];
+        UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            completionHandler([[alert.textFields lastObject] text]);
+        }];
+        [alert addAction:okAction];
+        UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(UIAlertAction *action) {
+            completionHandler(nil);
+        }];
+        [alert addAction:cancelAction];
+        alert.preferredAction = okAction;
+        [[self topViewController] presentViewController:alert animated:YES completion:NULL];
+    } else {
+        completionHandler(nil);
+    }
 #else
   NSAlert *alert = [[NSAlert alloc] init];
   [alert setMessageText:prompt];
@@ -1294,19 +1422,23 @@ RCTAutoInsetsProtocol>
                         initiatedByFrame:(WKFrameInfo *)frame
                                     type:(WKMediaCaptureType)type
                          decisionHandler:(void (^)(WKPermissionDecision decision))decisionHandler {
-  if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElsePrompt || _mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElseDeny) {
-    if ([origin.host isEqualToString:webView.URL.host]) {
+  if(_active){
+    if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElsePrompt || _mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElseDeny) {
+      if ([origin.host isEqualToString:webView.URL.host]) {
+        decisionHandler(WKPermissionDecisionGrant);
+      } else {
+        WKPermissionDecision decision = _mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElsePrompt ? WKPermissionDecisionPrompt : WKPermissionDecisionDeny;
+        decisionHandler(decision);
+      }
+    } else if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_Deny) {
+      decisionHandler(WKPermissionDecisionDeny);
+    } else if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_Grant) {
       decisionHandler(WKPermissionDecisionGrant);
     } else {
-      WKPermissionDecision decision = _mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_GrantIfSameHost_ElsePrompt ? WKPermissionDecisionPrompt : WKPermissionDecisionDeny;
-      decisionHandler(decision);
+      decisionHandler(WKPermissionDecisionPrompt);
     }
-  } else if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_Deny) {
-    decisionHandler(WKPermissionDecisionDeny);
-  } else if (_mediaCapturePermissionGrantType == RNCWebViewPermissionGrantType_Grant) {
-    decisionHandler(WKPermissionDecisionGrant);
   } else {
-    decisionHandler(WKPermissionDecisionPrompt);
+    decisionHandler(WKPermissionDecisionDeny);
   }
 }
 #endif
@@ -1320,6 +1452,32 @@ RCTAutoInsetsProtocol>
 }
 
 #endif // !TARGET_OS_OSX
+
+- (void)webView:(WKWebView *)webView contextMenuConfigurationForElement:(WKContextMenuElementInfo *)elementInfo completionHandler:(WK_SWIFT_UI_ACTOR void (^)(UIContextMenuConfiguration * _Nullable configuration))completionHandler WK_SWIFT_ASYNC_NAME(webView(_:contextMenuConfigurationFor:)) API_AVAILABLE(ios(13.0)) {
+    if(_active){
+        UIContextMenuConfiguration *defaultConfiguration = nil;
+        completionHandler(defaultConfiguration);
+    } else {
+        completionHandler(nil);
+    }
+}
+
+- (void)webView:(WKWebView *)webView didStartProvisionalNavigation:(WKNavigation *)navigation
+{
+  // Set opaque to NO to prevent white flash during initial load
+  _webView.opaque = NO;
+  // Clear the previous underPageBackgroundColor
+  _webView.underPageBackgroundColor = nil;
+}
+
+- (void)webView:(WKWebView *)webView didCommitNavigation:(WKNavigation *)navigation
+{
+  // Set opaque to YES when content starts loading
+  _webView.opaque = YES;
+  // Ensure background color is set
+  _webView.backgroundColor = _savedBackgroundColor;
+}
+
 
 /**
  * Decides whether to allow or cancel a navigation.
@@ -1595,6 +1753,44 @@ didFinishNavigation:(WKNavigation *)navigation
 {
   [self evaluateJS: script thenCall: nil];
 }
+
+- (void)dismissChildViewControllersIfNeeded {
+    if ([self topViewController]) {
+        [[self topViewController] dismissViewControllerAnimated:YES completion:nil];
+    }
+}
+
+- (void)setActive:(BOOL)enabled
+{
+    _active = enabled;
+  
+
+  if (!enabled) {
+    // Disable any potential view controller (alert / filepicker / etc)
+    [self dismissChildViewControllersIfNeeded];
+      
+    // Disable all media playback when the webview is no longer active
+      if (@available(iOS 15.0, *)) {
+          [self.webView setAllMediaPlaybackSuspended:YES completionHandler:nil];
+      }
+  } else {
+    // Restore all media playback when the webview is active again
+      if (@available(iOS 15.0, *)) {
+          [self.webView setAllMediaPlaybackSuspended:NO completionHandler:nil];
+      }
+  }
+}
+
+- (void)setJavaScriptEnabled:(BOOL)enabled {
+    _javaScriptEnabled = enabled;
+  
+  if (!enabled) {
+    _webView.configuration.preferences.javaScriptEnabled = NO;
+  } else {
+    _webView.configuration.preferences.javaScriptEnabled = YES;
+  }
+}
+
 
 - (void)goForward
 {

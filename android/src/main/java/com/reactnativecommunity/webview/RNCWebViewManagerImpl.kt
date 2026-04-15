@@ -1,6 +1,8 @@
 package com.reactnativecommunity.webview
 
+import android.app.AlertDialog
 import android.app.DownloadManager
+import android.content.DialogInterface
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -40,6 +42,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
     private var mWebViewConfig: RNCWebViewConfig = RNCWebViewConfig { webView: WebView? -> }
     private var mAllowsFullscreenVideo = false
     private var mAllowsProtectedMedia = false
+    private var mActive = false;
     private var mDownloadingMessage: String? = null
     private var mLackPermissionToDownloadMessage: String? = null
     private var mHasOnOpenWindowEvent = false
@@ -106,34 +109,40 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
 
             val downloadMessage = "Downloading $fileName"
 
-            //Attempt to add cookie, if it exists
-            var urlObj: URL? = null
-            try {
-                urlObj = URL(url)
-                val baseUrl = urlObj.protocol + "://" + urlObj.host
-                val cookie = CookieManager.getInstance().getCookie(baseUrl)
-                request.addRequestHeader("Cookie", cookie)
-            } catch (e: MalformedURLException) {
-                Log.w(TAG, "Error getting cookie for DownloadManager", e)
-            }
+            val builder = AlertDialog.Builder(webView.context)
+            builder.setMessage("Do you want to download \n$fileName?")
+            builder.setCancelable(false)
+            builder.setPositiveButton("Download") { _, _ ->
+                //Attempt to add cookie, if it exists
+                var urlObj: URL? = null
+                try {
+                    urlObj = URL(url)
+                    val baseUrl = urlObj.protocol + "://" + urlObj.host
+                    val cookie = CookieManager.getInstance().getCookie(baseUrl)
+                    request.addRequestHeader("Cookie", cookie)
+                } catch (e: MalformedURLException) {
+                    Log.w(TAG, "Error getting cookie for DownloadManager", e)
+                }
 
-            //Finish setting up request
-            request.addRequestHeader("User-Agent", userAgent)
-            request.setTitle(fileName)
-            request.setDescription(downloadMessage)
-            request.allowScanningByMediaScanner()
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-            module.setDownloadRequest(request)
-            if (module.grantFileDownloaderPermissions(
-                    getDownloadingMessageOrDefault(),
-                    getLackPermissionToDownloadMessageOrDefault()
-                )
-            ) {
-                module.downloadFile(
-                    getDownloadingMessageOrDefault()
-                )
+                //Finish setting up request
+                request.addRequestHeader("User-Agent", userAgent)
+                request.setTitle(fileName)
+                request.setDescription(downloadMessage)
+                request.allowScanningByMediaScanner()
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                module.setDownloadRequest(request)
+                if (module.grantFileDownloaderPermissions(
+                                getDownloadingMessageOrDefault(),
+                                getLackPermissionToDownloadMessageOrDefault()
+                        )
+                ) {
+                    module.downloadFile(getDownloadingMessageOrDefault())
+                }
             }
+            builder.setNegativeButton("Cancel") { _: DialogInterface?, _: Int -> }
+            val alertDialog = builder.create()
+            alertDialog.show()
         })
         return RNCWebViewWrapper(context, webView)
     }
@@ -290,6 +299,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
     val COMMAND_INJECT_JAVASCRIPT = 6
     val COMMAND_LOAD_URL = 7
     val COMMAND_FOCUS = 8
+    val COMMAND_SET_ACTIVE = 9
 
     // android commands
     val COMMAND_CLEAR_FORM_DATA = 1000
@@ -304,6 +314,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
         .put("stopLoading", COMMAND_STOP_LOADING)
         .put("postMessage", COMMAND_POST_MESSAGE)
         .put("injectJavaScript", COMMAND_INJECT_JAVASCRIPT)
+        .put("setActive", COMMAND_SET_ACTIVE)
         .put("loadUrl", COMMAND_LOAD_URL)
         .put("requestFocus", COMMAND_FOCUS)
         .put("clearFormData", COMMAND_CLEAR_FORM_DATA)
@@ -337,6 +348,9 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
           )
         } catch (e: JSONException) {
           throw RuntimeException(e)
+        }
+        "setActive" -> {
+            this.mActive = args.getBoolean(0)
         }
         "injectJavaScript" -> webView.evaluateJavascriptWithFallback(args.getString(0))
         "loadUrl" -> {
@@ -403,6 +417,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
                 if (previousUrl != null && previousUrl == url) {
                     return
                 }
+
                 if (source.hasKey("method")) {
                     val method = source.getString("method")
                     if (method.equals(HTTP_METHOD_POST, ignoreCase = true)) {
@@ -485,6 +500,11 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
         view.clearFormData();
         view.settings.savePassword = false;
         view.settings.saveFormData = false;
+    }
+
+    fun setSandbox(viewWrapper: RNCWebViewWrapper, value: Boolean) {
+        val view = viewWrapper.webView
+        view.sandbox = value
     }
 
     fun setInjectedJavaScript(viewWrapper: RNCWebViewWrapper, injectedJavaScript: String?) {

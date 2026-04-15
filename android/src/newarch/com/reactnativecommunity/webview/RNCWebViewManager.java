@@ -160,6 +160,11 @@ public class RNCWebViewManager extends ViewGroupManager<RNCWebViewWrapper>
         mRNCWebViewManagerImpl.setIncognito(view, value);
     }
 
+    @ReactProp(name = "sandbox")
+    public void setSandbox(RNCWebViewWrapper view, boolean value) {
+        mRNCWebViewManagerImpl.setSandbox(view, value);
+    }
+
     @Override
     @ReactProp(name = "injectedJavaScript")
     public void setInjectedJavaScript(RNCWebViewWrapper view, @Nullable String value) {
@@ -459,6 +464,11 @@ public class RNCWebViewManager extends ViewGroupManager<RNCWebViewWrapper>
   @Override
   public void injectJavaScript(RNCWebViewWrapper view, String javascript) {
       view.getWebView().evaluateJavascriptWithFallback(javascript);
+  }
+
+  @Override
+  public void setActive(RNCWebViewWrapper view, boolean enabled) {
+      view.getWebView().active = enabled;
   }
 
   @Override
