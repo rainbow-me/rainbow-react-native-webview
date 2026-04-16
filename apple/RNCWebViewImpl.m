@@ -1345,14 +1345,18 @@ RCTAutoInsetsProtocol>
  */
 - (void)webView:(WKWebView *)webView runJavaScriptConfirmPanelWithMessage:(NSString *)message initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))completionHandler{
 #if !TARGET_OS_OSX
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:message preferredStyle:UIAlertControllerStyleAlert];
-  [alert addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
-    completionHandler(YES);
-  }]];
-  [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) {
-    completionHandler(NO);
-  }]];
-  [[self topViewController] presentViewController:alert animated:YES completion:NULL];
+    if(_active){
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:message preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+            completionHandler(YES);
+        }]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) {
+            completionHandler(NO);
+        }]];
+        [[self topViewController] presentViewController:alert animated:YES completion:NULL];
+    } else {
+        completionHandler(NO);
+    }
 #else
   NSAlert *alert = [[NSAlert alloc] init];
   [alert setMessageText:message];
