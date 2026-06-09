@@ -155,7 +155,7 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
      * reporter is registered.
      */
     public interface SandboxBlockReporter {
-        void report(String host, String url, String source);
+        void report(String host, String url);
     }
 
     private static SandboxBlockReporter sandboxBlockReporter;
@@ -167,7 +167,7 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
     static void reportSandboxBlock(String host, String url) {
         SandboxBlockReporter reporter = sandboxBlockReporter;
         if (reporter != null && host != null) {
-            reporter.report(host, url, "webview");
+            reporter.report(host, url);
         }
     }
 
