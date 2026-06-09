@@ -151,8 +151,7 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
     }
 
     /**
-     * Optional callback invoked when a navigation is blocked. Host apps may
-     * register a reporter; the fork stays decoupled and this is a no-op when no
+     * Optional host app callback invoked when a navigation is blocked. No-op when no
      * reporter is registered.
      */
     public interface SandboxBlockReporter {
