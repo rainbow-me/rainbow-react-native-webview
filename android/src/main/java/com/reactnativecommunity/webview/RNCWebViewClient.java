@@ -99,6 +99,7 @@ public class RNCWebViewClient extends WebViewClient {
       String host = Uri.parse(url).getHost();
       if (host != null && !reactWebView.isHostAllowed(host)) {
         reactWebView.stopLoading();
+        RNCWebView.reportSandboxBlock(host, url);
         this.onReceivedError(webView, -1, "Navigation blocked by sandbox: " + url, url);
         return;
       }
@@ -110,8 +111,10 @@ public class RNCWebViewClient extends WebViewClient {
     public boolean shouldOverrideUrlLoading(WebView view, String url) {
         final RNCWebView rncWebView = (RNCWebView) view;
         final boolean isJsDebugging = rncWebView.getReactApplicationContext().getJavaScriptContextHolder().get() == 0;
-        if(!rncWebView.isHostAllowed(Uri.parse(url).getHost())){
+        final String host = Uri.parse(url).getHost();
+        if(!rncWebView.isHostAllowed(host)){
             rncWebView.stopLoading();
+            RNCWebView.reportSandboxBlock(host, url);
             this.onReceivedError(view, -1, "Navigation blocked by sandbox: " + url, url);
             return true;
         }

@@ -150,6 +150,27 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
         setupWeb3DocumentStartJavaScript();
     }
 
+    /**
+     * Optional host app callback invoked when a navigation is blocked. No-op when no
+     * reporter is registered.
+     */
+    public interface SandboxBlockReporter {
+        void report(String host, String url);
+    }
+
+    private static SandboxBlockReporter sandboxBlockReporter;
+
+    public static void setSandboxBlockReporter(SandboxBlockReporter reporter) {
+        sandboxBlockReporter = reporter;
+    }
+
+    static void reportSandboxBlock(String host, String url) {
+        SandboxBlockReporter reporter = sandboxBlockReporter;
+        if (reporter != null && host != null) {
+            reporter.report(host, url);
+        }
+    }
+
     public void setBasicAuthCredential(RNCBasicAuthCredential credential) {
         mRNCWebViewClient.setBasicAuthCredential(credential);
     }
