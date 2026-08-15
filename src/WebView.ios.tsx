@@ -4,10 +4,11 @@ import React, {
   useImperativeHandle,
   useRef,
 } from 'react';
-import { Image, View, ImageSourcePropType, HostComponent } from 'react-native';
+import { Image, ImageSourcePropType, HostComponent } from 'react-native';
 import invariant from 'invariant';
 
 import RNCWebView, { Commands, NativeProps } from './RNCWebViewNativeComponent';
+import RNCWebViewRetainedContainer from './RNCWebViewRetainedContainerNativeComponent';
 import RNCWebViewModule from './NativeRNCWebViewModule';
 
 import {
@@ -286,10 +287,10 @@ const WebViewComponent = forwardRef<{}, IOSWebViewProps>(
     );
 
     return (
-      <View style={webViewContainerStyle}>
+      <RNCWebViewRetainedContainer style={webViewContainerStyle}>
         {webView}
         {otherView}
-      </View>
+      </RNCWebViewRetainedContainer>
     );
   }
 );
