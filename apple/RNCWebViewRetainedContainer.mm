@@ -23,6 +23,15 @@ using namespace facebook::react;
 
 @implementation RNCWebViewRetainedContainer
 
+- (instancetype)initWithFrame:(CGRect)frame
+{
+  if (self = [super initWithFrame:frame]) {
+    static const auto defaultProps = std::make_shared<const RNCWebViewRetainedContainerProps>();
+    _props = defaultProps;
+  }
+  return self;
+}
+
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
   return concreteComponentDescriptorProvider<RNCWebViewRetainedContainerRetainingComponentDescriptor>();
